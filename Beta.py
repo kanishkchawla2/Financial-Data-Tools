@@ -1,10 +1,19 @@
 import io
+import os
 from datetime import datetime
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 import yfinance as yf
+
+
+def load_stocks_from_csv(filename: str = "stocks.csv") -> list[str]:
+    """Load stock symbols from a CSV file."""
+    if os.path.exists(filename):
+        df = pd.read_csv(filename)
+        return df["symbol"].tolist()
+    return []
 
 
 def get_market_cap_cr(ticker: str) -> float:
@@ -191,19 +200,38 @@ def main() -> None:
     st.caption("Add stocks and indices, compute beta metrics, and export to CSV.")
 
     if "stocks" not in st.session_state:
-        st.session_state["stocks"] = [""]
+        st.session_state["stocks"] = []
     if "indices" not in st.session_state:
         st.session_state["indices"] = ["^NSEI"]
     if "result_df" not in st.session_state:
         st.session_state["result_df"] = None
 
+    # Load available stocks from CSV
+    available_stocks = load_stocks_from_csv("stocks.csv")
+
     left, right = st.columns(2)
 
     with left:
         st.subheader("Stocks")
-        new_stock = st.text_input("Add stock symbol", placeholder="e.g. TCS.NS")
-        if st.button("Add Stock", use_container_width=True):
-            add_symbol("stocks", new_stock)
+        st.caption("If not listed, select 'Other' to add a custom stock symbol")
+        
+        # Add "Other" option
+        stock_options = available_stocks + ["Other"]
+        
+        selected_stock = st.selectbox("Select stock symbol", options=stock_options, key="stock_select")
+        
+        if selected_stock == "Other":
+            # If "Other" is selected, show text input
+            custom_stock = st.text_input("Enter custom stock symbol", placeholder="e.g. CUSTOM", key="custom_stock")
+            if st.button("Add Stock", use_container_width=True):
+                if custom_stock:
+                    add_symbol("stocks", custom_stock)
+                else:
+                    st.error("Please enter a stock symbol.")
+        else:
+            # If a listed stock is selected, show regular button
+            if st.button("Add Stock", use_container_width=True):
+                add_symbol("stocks", selected_stock)
 
         if st.session_state["stocks"]:
             stock_to_remove = st.selectbox("Remove stock", st.session_state["stocks"], key="stock_remove")
@@ -215,6 +243,7 @@ def main() -> None:
 
     with right:
         st.subheader("Indices")
+        st.caption("^NSEI is Nifty 50 by default")
         new_index = st.text_input("Add index symbol", placeholder="e.g. ^NSEI")
         if st.button("Add Index", use_container_width=True):
             add_symbol("indices", new_index)
